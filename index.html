@@ -1,1 +1,316 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Disbecol | Consulta de Validades</title>
+  <link rel="icon" type="image/png" href="Disbecol.png">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 650px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 0 16px rgba(0,0,0,0.10);
+    }
+
+    .cabecalho {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .logo {
+      width: 340px;
+      max-width: 90%;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      color: #222;
+      margin: 10px 0 5px;
+      font-size: 26px;
+    }
+
+    .subtitulo {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px;
+      font-size: 18px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      text-align: center;
+      border-top: 1px solid #ddd;
+      padding-top: 22px;
+      margin-top: 18px;
+    }
+
+    .card img {
+      max-width: 240px;
+      max-height: 240px;
+      object-fit: contain;
+      margin-bottom: 18px;
+    }
+
+    .info {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+
+    .validade {
+      font-size: 21px;
+      font-weight: bold;
+      margin-top: 15px;
+    }
+
+    .verde {
+      color: green;
+      font-weight: bold;
+    }
+
+    .amarelo {
+      color: #c58b00;
+      font-weight: bold;
+    }
+
+    .vermelho {
+      color: red;
+      font-weight: bold;
+    }
+
+    .vazio {
+      text-align: center;
+      color: #777;
+      font-size: 16px;
+      margin-top: 20px;
+    }
+
+    .erro-img {
+      width: 220px;
+      height: 160px;
+      margin: auto;
+      margin-bottom: 18px;
+      background: #eee;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #777;
+      font-size: 16px;
+    }
+
+    .rodape {
+      text-align: center;
+      color: #777;
+      font-size: 12px;
+      margin-top: 30px;
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <div class="cabecalho">
+      <img src="Disbecollogo.png" class="logo" alt="Logo Disbecol">
+      <h1>Consulta de Validades</h1>
+    </div>
+
+    <input 
+      type="text" 
+      id="pesquisa" 
+      placeholder="Digite o código ou nome do produto"
+      autocomplete="off"
+    >
+    <div id="resultado" class="vazio">
+      
+    </div>
+
+    <div class="rodape">
+      Sistema de Consulta de Validades - Disbecol
+    </div>
+
+  </div>
+
+  <script>
+    const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8L6raGcEWBp4BraqTH_LbKFkR6a0EXkm-3ZJcYSYZRUTIymU_Jp6aZtkErXFn7Zdy6V4NtgwqllAQ/pub?gid=0&single=true&output=csv";
+
+    let dados = [];
+
+    function converterDataBR(data) {
+      const partes = data.split("/");
+      return new Date(partes[2], partes[1] - 1, partes[0]);
+    }
+
+    function calcularStatus(validade) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const dataValidade = converterDataBR(validade);
+      const dias = Math.ceil((dataValidade - hoje) / (1000 * 60 * 60 * 24));
+
+      if (dias <= 30) {
+        return { texto: "Crítico", classe: "vermelho", dias };
+      } else if (dias <= 60) {
+        return { texto: "Atenção", classe: "amarelo", dias };
+      } else {
+        return { texto: "Saudável", classe: "verde", dias };
+      }
+    }
+
+    function carregarImagem(codigo, produto) {
+      const formatos = ["jpg", "jpeg", "png", "JPG", "JPEG", "PNG"];
+      let indice = 0;
+
+      const img = document.createElement("img");
+      img.alt = produto;
+
+      function tentarImagem() {
+        if (indice >= formatos.length) {
+          const div = document.createElement("div");
+          div.className = "erro-img";
+          div.innerText = "Imagem não disponível";
+          img.replaceWith(div);
+          return;
+        }
+
+        img.onerror = function() {
+          indice++;
+          tentarImagem();
+        };
+
+        img.src = `imagens/${codigo}.${formatos[indice]}`;
+      }
+
+      tentarImagem();
+      return img;
+    }
+
+    function carregarDados() {
+      fetch(urlCSV + "&t=" + new Date().getTime())
+        .then(response => response.text())
+        .then(csv => {
+          const linhas = csv.trim().split("\n").map(linha => linha.split(","));
+
+          dados = linhas.slice(1).map(linha => ({
+            codigo: linha[0]?.trim(),
+            produto: linha[1]?.trim(),
+            validade: linha[2]?.trim()
+          }));
+        })
+        .catch(() => {
+          document.getElementById("resultado").innerHTML =
+            "Erro ao carregar a base de dados.";
+        });
+    }
+
+    document.getElementById("pesquisa").addEventListener("input", function() {
+      const termo = this.value.trim().toLowerCase();
+      const resultado = document.getElementById("resultado");
+
+      if (!termo) {
+        resultado.innerHTML = "";
+        resultado.className = "vazio";
+        return;
+      }
+
+      const palavras = termo.split(" ").filter(p => p);
+
+      let encontrados = dados.filter(item => {
+        const codigo = item.codigo.toLowerCase();
+        const produto = item.produto.toLowerCase();
+
+        const buscaPorCodigo = codigo === termo;
+        const buscaPorNome = palavras.every(palavra => produto.includes(palavra));
+
+        return buscaPorCodigo || buscaPorNome;
+      });
+
+      if (encontrados.length === 0) {
+        resultado.innerHTML = "Nenhum produto encontrado.";
+        resultado.className = "vazio";
+        return;
+      }
+
+      const mapa = new Map();
+
+      encontrados.forEach(item => {
+        const chave = item.codigo;
+        const statusAtual = calcularStatus(item.validade);
+
+        if (!mapa.has(chave)) {
+          mapa.set(chave, item);
+        } else {
+          const itemExistente = mapa.get(chave);
+          const statusExistente = calcularStatus(itemExistente.validade);
+
+          if (statusAtual.dias < statusExistente.dias) {
+            mapa.set(chave, item);
+          }
+        }
+      });
+
+      encontrados = Array.from(mapa.values());
+
+      encontrados.sort((a, b) => {
+        return calcularStatus(a.validade).dias - calcularStatus(b.validade).dias;
+      });
+
+      resultado.className = "";
+      resultado.innerHTML = "";
+
+      encontrados.forEach(item => {
+        const status = calcularStatus(item.validade);
+
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const imagem = carregarImagem(item.codigo, item.produto);
+        card.appendChild(imagem);
+
+        if (status.dias > 120) {
+          card.innerHTML += `
+            <div class="info"><strong>Código:</strong> ${item.codigo}</div>
+            <div class="info"><strong>Produto:</strong> ${item.produto}</div>
+            <div class="validade verde">Produto com Validade acima de 120 dias!</div>
+          `;
+        } else {
+          card.innerHTML += `
+            <div class="info"><strong>Código:</strong> ${item.codigo}</div>
+            <div class="info"><strong>Produto:</strong> ${item.produto}</div>
+            <div class="validade"><strong>Validade mais próxima:</strong> ${item.validade}</div>
+            <div class="info"><strong>Dias para vencer:</strong> ${status.dias}</div>
+          `;
+        }
+
+        resultado.appendChild(card);
+      });
+    });
+
+    carregarDados();
+  </script>
+
+</body>
+</html>
